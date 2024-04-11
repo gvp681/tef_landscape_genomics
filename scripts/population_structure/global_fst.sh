@@ -1,6 +1,7 @@
 #!/bin/bash
 
 ##### Locations containing more than one sample were grouped and split into separate text files containing the prefix COORD_FST* 
+##### See COORD_bins.csv in /Data for bins
 
 # Define the main output file
 #main_output="main_output.txt"
