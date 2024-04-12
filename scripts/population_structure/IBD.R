@@ -47,11 +47,11 @@ merged_df <- merge(dist_df, fst_df, by = c("Var1", "Var2"), all = TRUE)
 unique_merged_df <- merged_df[!duplicated(merged_df$fst), ]
 
 ## Plot
-plot(prov$dist, prov$g_dist, pch=20, cex=0.5,xlab="Geographic Distance", ylab="Prevosti's Distance")
-image(dens, col = transparentColors, add = TRUE)
-abline(lm(prov$g_dist ~ prov$dist))
-lines(loess.smooth(prov$dist, prov$g_dist), col="red")
-#######NOT DONE###############
+ggplot(merged_df, aes(x = dist, y = fst)) +
+    geom_point(shape = 23, size = 2, fill = "black") +  # Scatter plot
+    geom_smooth(method = "lm", color = "maroon") +  # Linear regression line
+    labs(x = "Geographic Distance (km)", y = "FST") +  # Axis labels
+    theme_classic()
 
 ################ Mantel Tests ######################
 ## Create Pairwise Distance Matrices from Dataframes without Calculation (distances already calculated)
