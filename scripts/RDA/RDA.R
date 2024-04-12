@@ -32,3 +32,9 @@ identical(rownames(gen.imp), env[,1])
 ### Each reduced model's statistical significance was evaluated using a permutation-based analysis of variance (ANOVA) 
 ### with 999 permutations and a significance level (α) of 0.05 model, subset data with model chosen variables.
 pred <- subset(env, select = c("bio1","bio7","bio13","bio14","bio18","bio19")) 
+
+## Save Files
+save("rda.RData")
+write.csv(pred,"env_subset_rda.csv")
+```
+
