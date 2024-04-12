@@ -40,4 +40,4 @@ for i in COORD_*.txt; do
     #fi
   done
 
-## Only non-zero FST values were retained for further analysis
+## Negative FST  estimates were converted to zeros for subsequent analysis
