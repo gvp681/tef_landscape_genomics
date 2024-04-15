@@ -22,14 +22,32 @@ library(viridis)
 library(vegan)
 library(raster)
 library(terra)
+library(pegas)
 
-load("wolf.rda.RData")
+load("rda.RData") # load RDA results from vegan package
 
 ```
+# *Current Adaptive Indices*
 
+### Scale and Center Select Environmental Variables
+```{r}
+pred <- read.csv(env_subset_rda.csv")
+pred <- pred[-1]
+Env <- scale(pred, center = TRUE, scale = TRUE)
+scale_env <- attr(Env, 'scaled:scale')
+center_env <- attr(Env, 'scaled:center')
+```
 
+### Create "env_pres" raster file
+```{r}
+r <- getData("worldclim", var="bio",res=10)
+et <- ne_states(country = "ethiopia", returnclass = "sf")
+geometry <- et$geometry
+sp_geometry <- as(geometry, "Spatial")
+raster_subset <- raster::mask(r, mask = sp_geometry)
+```
 
-### Function to project the adaptive component turnover across the landscape
+### Creat function to project the adaptive component turnover across the landscape
 ```{r}
 adaptive_index <- function(RDA, K, env_pres, range = NULL, method = "loadings", scale_env, center_env){
 # Formatting environmental rasters for projection
@@ -65,22 +83,231 @@ return(Proj_pres = Proj_pres)
 }
 ```
 
-
-### Scale and Center Select Environmental Variables
+### Calculate Adaptive Indices for Current Conditions
 ```{r}
-pred <- read.csv(env_subset_rda.csv")
-pred <- pred[-1]
-Env <- scale(pred, center = TRUE, scale = TRUE)
-scale_env <- attr(Env, 'scaled:scale')
-center_env <- attr(Env, 'scaled:center')
+res_RDA_proj_current <- adaptive_index(RDA = RDA.rda, K = 2, env_pres = raster_subset, method = "loadings", scale_env = scale_env, center_env = center_env)
+RDA_proj <- list(res_RDA_proj_current$RDA1, res_RDA_proj_current$RDA2)
+RDA_proj <- lapply(RDA_proj, function(x) rasterToPoints(x))
+for(i in 1:length(RDA_proj)){
+RDA_proj[[i]][,3] <- (RDA_proj[[i]][,3]-min(RDA_proj[[i]][,3]))/(max(RDA_proj[[i]][,3])-min(RDA_proj[[i]][,3]))
+}
+TAB_RDA <- as.data.frame(do.call(rbind, RDA_proj[1:2]))
+colnames(TAB_RDA)[3] <- "value"
+TAB_RDA$variable <- factor(c(rep("RDA1", nrow(RDA_proj[[1]])), rep("RDA2", nrow(RDA_proj[[2]]))), levels = c("RDA1","RDA2"))
 ```
 
-
-### Create "env_pres" raster file
+### Plot Current Projection
 ```{r}
-r <- getData("worldclim", var="bio",res=10)
-et <- ne_states(country = "ethiopia", returnclass = "sf")
-geometry <- et$geometry
-sp_geometry <- as(geometry, "Spatial")
-raster_subset <- raster::mask(r, mask = sp_geometry)
+ggplot(data = TAB_RDA) +
+geom_sf(data = et, fill=gray(.9), size=0) +
+geom_raster(aes(x = x, y = y, fill = cut(value, breaks=seq(0, 1, length.out=10), include.lowest = T))) +
+scale_fill_viridis_d(alpha = 0.8, direction = -1, option = "A", labels = c("Negative scores","","","","Intermediate scores","","","","Positive scores")) +
+geom_sf(data = et, fill=NA, size=0.1) +
+coord_sf(xlim = c(33, 48), ylim = c(3, 15), expand = FALSE) +
+xlab("Longitude") + ylab("Latitude") +
+guides(fill=guide_legend(title="Adaptive index")) +
+facet_grid(~ variable) +
+theme_bw(base_size = 11, base_family = "Times") +
+theme(panel.grid = element_blank(), plot.background = element_blank(), panel.background = element_blank(), strip.text = element_text(size=11))
 ```
+#######################################################################################################################################################################
+### RDA can be used to predict the optimal adaptive index for each environmental pixel under consideration, using both current and future environmental conditions. The difference between the two predictions provides an estimate of the shift in adaptive index that would be required to track climate change. This proxy has been successively named genetic/genomic offset (Fitzpatrick & Keller, 2015), risk of non-adaptedness (Rellstab et al., 2016) or genomic vulnerability (Bay et al., 2018).
+
+# Begin by downloading the ensemble projections for 2080.
+
+# Go to this site: https://adaptwest.databasin.org/pages/adaptwest-climatena-cmip5/
+
+# Scroll down to the following data sets and download them:
+# *** In all cases, download the ASCII format ***
+  # (1) Projection, Ensemble of 13 CMIP6 AOGCMs, RCP 4.5, SSP2, 2080
+
+# Unzip using the default folder names & put these into a folder called "ClimateNA" located in the folder "Data"
+#######################################################################################################################################################################
+
+# *Projected Adaptive Indices*
+
+### Load ClimateNA bioclimatic variables predicted for 2080 using RCP4.5 SSP2 climate scenario and the ensemble projection of 13 CMIP5 AOGCMs:
+```{r}
+# Get a list of GEOTIFF files in the specified directory
+geotiff_files <- list.files("./", pattern = ".tif$", full.names = TRUE) #run outside of chunk
+
+# Read GEOTIFF files into a raster stack
+ras_2080 <- stack(geotiff_files)
+
+# Extract variable names from file names
+names(ras_2080) <- gsub(".tif$", "", tools::file_path_sans_ext(basename(geotiff_files)))
+
+# Calculate ensemble mean for each bioclimatic variable
+ensemble_mean <- calc(ras_2080, fun = mean, na.rm = TRUE)
+
+# Save the ensemble mean as a GEOTIFF file
+writeRaster(ensemble_mean, filename = "./ensemble_mean_2080.tif", format = "GTiff", overwrite = TRUE)
+```
+
+### Create RasterStack for each GCM
+```{r}
+# Get a list of GEOTIFF files in the specified directory
+geotiff_files <- list.files("./", pattern = "wc*.tif$", full.names = TRUE)
+names_list <- c("AC","CM","EC","FI","GI","HA","IN","IP","MI","MP","MR","UK") # this can change depending on the chosen models
+
+# Create RasterStacks
+
+for(i in 1:length(names_list) ){
+  name <- lapply(names_list, function(names) names_list[[i]])
+  raster <- stack(geotiff_files[i])
+  names(raster) <-paste0("bio", 1:19)
+  assign(names_list[i], raster)
+}
+
+# Extract 19 bioclimatic layers from each GCM RasterStack and Save
+
+for(j in names_list){
+    paste(print(j))
+    raster_stack <- get(j)
+    for(i in 1:nlayers(raster_stack)){
+        band <- raster_stack[[i]]
+        print(band)
+        writeRaster(band,paste(print(j),'_',i,'.tif', sep=''), format = "Gtiff", overwrite = TRUE)
+        
+    }}
+
+# Calculate Ensemble Means Across GCMs for each bioclimatic variable
+### Change number in pattern and number in for-loop to match bio suffixes (e.g., 1:19). For consecutive runs, input one variable at a time. ###
+
+geotiff_files <- list.files("./", pattern = "*_1.tif$", full.names = TRUE)
+s <- stack(geotiff_files)
+
+for(i in 1:19){
+  geotiff_files <- list.files("./", pattern = paste("*_",i,".tif$",sep=''), full.names = TRUE)
+  s <- stack(geotiff_files)
+  emean <- calc(s, fun = mean, na.rm = TRUE)
+  writeRaster(emean,paste('ensemble_mean_',i,'.tif', sep=''), format = "Gtiff", overwrite = TRUE)
+}
+```
+#######################################################################################################################################################################
+
+# *Genomic Offset*
+
+### Function to predict genomic offset from an RDA model
+```{r}
+genomic_offset <- function(RDA, K, env_pres, env_fut, range = NULL, method = "loadings", scale_env, center_env){
+  
+  # Mask with the range if supplied
+  if(!is.null(range)){
+    env_pres <- mask(env_pres, range)
+    env_fut <- mask(env_fut, range)
+  }
+  
+  # Formatting and scaling environmental rasters for projection
+  var_env_proj_pres <- as.data.frame(scale(rasterToPoints(env_pres[[row.names(RDA$CCA$biplot)]])[,-c(1,2)], center_env[row.names(RDA$CCA$biplot)], scale_env[row.names(RDA$CCA$biplot)]))
+  var_env_proj_fut <- as.data.frame(scale(rasterToPoints(env_fut[[row.names(RDA$CCA$biplot)]])[,-c(1,2)], center_env[row.names(RDA$CCA$biplot)], scale_env[row.names(RDA$CCA$biplot)]))
+
+  # Predicting pixels genetic component based on the loadings of the variables
+  if(method == "loadings"){
+    # Projection for each RDA axis
+    Proj_pres <- list()
+    Proj_fut <- list()
+    Proj_offset <- list()
+    for(i in 1:K){
+      # Current climates
+      ras_pres <- env_pres[[1]]
+      ras_pres[!is.na(ras_pres)] <- as.vector(apply(var_env_proj_pres[,names(RDA$CCA$biplot[,i])], 1, function(x) sum( x * RDA$CCA$biplot[,i])))
+      names(ras_pres) <- paste0("RDA_pres_", as.character(i))
+      Proj_pres[[i]] <- ras_pres
+      names(Proj_pres)[i] <- paste0("RDA", as.character(i))
+      # Future climates
+      ras_fut <- env_fut[[1]]
+      ras_fut[!is.na(ras_fut)] <- as.vector(apply(var_env_proj_fut[,names(RDA$CCA$biplot[,i])], 1, function(x) sum( x * RDA$CCA$biplot[,i])))
+      Proj_fut[[i]] <- ras_fut
+      names(ras_fut) <- paste0("RDA_fut_", as.character(i))
+      names(Proj_fut)[i] <- paste0("RDA", as.character(i))
+      # Single axis genetic offset 
+      Proj_offset[[i]] <- abs(Proj_pres[[i]] - Proj_fut[[i]])
+      names(Proj_offset)[i] <- paste0("RDA", as.character(i))
+    }
+  }
+  
+  # Predicting pixels genetic component based on predict.RDA
+  if(method == "predict"){ 
+    # Prediction with the RDA model and both set of envionments 
+    pred_pres <- predict(RDA, var_env_proj_pres[,-c(1,2)], type = "lc")
+    pred_fut <- predict(RDA, var_env_proj_fut[,-c(1,2)], type = "lc")
+    
+    # List format
+    Proj_offset <- list()    
+    Proj_pres <- list()
+    Proj_fut <- list()
+    for(i in 1:K){
+      # Current climates
+      ras_pres <- rasterFromXYZ(data.frame(var_env_proj_pres[,c(1,2)], Z = as.vector(pred_pres[,i])), crs = crs(env_pres))
+      names(ras_pres) <- paste0("RDA_pres_", as.character(i))
+      Proj_pres[[i]] <- ras_pres
+      names(Proj_pres)[i] <- paste0("RDA", as.character(i))
+      # Future climates
+      ras_fut <- rasterFromXYZ(data.frame(var_env_proj_pres[,c(1,2)], Z = as.vector(pred_fut[,i])), crs = crs(env_pres))
+      names(ras_fut) <- paste0("RDA_fut_", as.character(i))
+      Proj_fut[[i]] <- ras_fut
+      names(Proj_fut)[i] <- paste0("RDA", as.character(i))
+      # Single axis genetic offset 
+      Proj_offset[[i]] <- abs(Proj_pres[[i]] - Proj_fut[[i]])
+      names(Proj_offset)[i] <- paste0("RDA", as.character(i))
+    }
+  }
+  
+  # Weights based on axis eigen values
+  weights <- RDA$CCA$eig/sum(RDA$CCA$eig)
+  
+  # Weighing the current and future adaptive indices based on the eigen values of the associated axes
+  Proj_offset_pres <- do.call(cbind, lapply(1:K, function(x) rasterToPoints(Proj_pres[[x]])[,-c(1,2)]))
+  Proj_offset_pres <- as.data.frame(do.call(cbind, lapply(1:K, function(x) Proj_offset_pres[,x]*weights[x])))
+  Proj_offset_fut <- do.call(cbind, lapply(1:K, function(x) rasterToPoints(Proj_fut[[x]])[,-c(1,2)]))
+  Proj_offset_fut <- as.data.frame(do.call(cbind, lapply(1:K, function(x) Proj_offset_fut[,x]*weights[x])))
+  
+  # Predict a global genetic offset, incorporating the K first axes weighted by their eigen values
+  ras <- Proj_offset[[1]]
+  ras[!is.na(ras)] <- unlist(lapply(1:nrow(Proj_offset_pres), function(x) dist(rbind(Proj_offset_pres[x,], Proj_offset_fut[x,]), method = "euclidean")))
+  names(ras) <- "Global_offset"
+  Proj_offset_global <- ras
+  
+  # Return projections for current and future climates for each RDA axis, prediction of genetic offset for each RDA axis and a global genetic offset 
+  return(list(Proj_pres = Proj_pres, Proj_fut = Proj_fut, Proj_offset = Proj_offset, Proj_offset_global = Proj_offset_global, weights = weights[1:K]))
+}
+```
+
+### Load Ensemble Files and Calculate Genomic Offset
+```{r}
+
+e_files <- list.files("./", pattern = "ensemble_*", full.names = T)
+
+ras_2080 <- stack(e_files)
+
+names(ras_2080) <- c("bio1","bio10","bio11","bio12","bio13","bio14","bio15","bio16","bio17","bio18","bio19","bio2","bio3","bio4","bio5","bio6","bio7","bio8","bio9")
+
+ras_2080_crop <- raster::mask(ras_2080, mask = sp_geometry)
+
+
+res_RDA_proj2080 <- genomic_offset(wolf.rda, K = 2, env_pres = raster_subset, env_fut = ras_2080_crop, range = NULL, method = "loadings", scale_env = scale_env, center_env = center_env)
+``` 
+
+### Calculate Global Genomic Offset
+```{r}
+RDA_proj_offset <- data.frame(rasterToPoints(res_RDA_proj2080$Proj_offset_global))
+RDA_proj_offset$Date <- rep("2080", nrow(rasterToPoints(res_RDA_proj2080$Proj_offset_global)))
+```
+
+### Plot Global Genomic Offset
+```{r}
+colors <- c(colorRampPalette(brewer.pal(11, "Spectral")[6:5])(3), colorRampPalette(brewer.pal(11, "Spectral")[4:3])(4), colorRampPalette(brewer.pal(11, "Spectral")[2:1])(5))
+
+ggplot(data = RDA_proj_offset) + 
+    geom_sf(data = et, fill=gray(.9), size=0) +
+    geom_raster(aes(x = x, y = y, fill = cut(Global_offset, breaks=seq(0, 2, by = 0.09), include.lowest = T)), alpha = 1) + 
+    scale_fill_manual(values = colors, labels = c("0.5","","","","1.0","","","","", "1.5"), guide = guide_legend(title="Genomic offset", title.position = "top", title.hjust = 0.5, ncol = 1, label.position="right"), na.translate = F) +
+    geom_sf(data = et, fill=NA, size=0.1) +
+    coord_sf(xlim = c(33, 48), ylim = c(3, 15), expand = FALSE) +
+    xlab("Longitude") + ylab("Latitude") +
+    facet_grid(~ Date) +
+    theme_bw(base_size = 11, base_family = "Times") +
+    theme(panel.grid = element_blank(), plot.background = element_blank(), panel.background = element_blank(), strip.text = element_text(size=11))
+```
+
