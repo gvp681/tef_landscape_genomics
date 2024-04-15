@@ -1,0 +1,5 @@
+#!/bin/bash
+
+gzip *.vcf
+
+ 
