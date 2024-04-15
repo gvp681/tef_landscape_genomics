@@ -23,9 +23,8 @@ library(vegan)
 library(raster)
 library(terra)
 
-setwd("C:/Users/kirst/OneDrive - Colostate/Documents/CSU/McKay_Lab/PhD_doc/Dissertation_Chapters/Chap1_TefPopGen/tef_data/Data_Excel/Outlier Detection/RDA")
 load("wolf.rda.RData")
-load("C:/Users/kirst/OneDrive - Colostate/Documents/CSU/McKay_Lab/PhD_doc/Dissertation_Chapters/Chap1_TefPopGen/tef_data/Data_Excel/Outlier Detection/RDA/raster_subset_adaptive_values.RData")
+
 ```
 
 
