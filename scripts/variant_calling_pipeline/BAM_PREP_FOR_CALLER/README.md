@@ -1,7 +1,7 @@
 <summary>BAM_PREP_FOR_CALLER STEPS</summary>
 
 1.	Make sure reference fasta file is indexed before beginning
-    <summary>Run $ bash index.sh </summary>
+    Run $ bash index.sh 
 
 2.	SANITY CHECK -- Check output errors and file sizes
   	Run $ ls -l (Go to each subdirectory and check for abnormal bam file sizes)
