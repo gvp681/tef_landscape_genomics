@@ -1,0 +1,177 @@
+### Code was adapted from https://github.com/Yunqing-Yu/tef-abscission-zone/blob/main/ClusterProfiler-dabbi_final.R
+### For Bioconductor Genome wide annotation of tef and use of code below, please contact and cite:
+### Yunqing Yu; https://doi.org/10.1093/plphys/kiad079
+
+---
+title: "Gene Ontology Enrichment"
+author: "Kirsten Hein"
+date: "2023-12-05"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Install SvOrgDb from local
+```{r}
+install.packages("/local/org.Etef.eg.db",repos = NULL, type="source")
+```
+
+### Load Packages and Set-up Environment
+```{r}
+library(clusterProfiler)
+library(org.Etef.eg.db)
+library(GOSemSim)
+library(enrichplot)
+library(writexl)
+library(readxl)
+library(dplyr)
+
+```
+
+### Load gene list from GO_input - Kirsten Hein Code
+```{r}
+gene_names <- read.table("/local/Gene_ID_clusterProfiler/GO_genelist.csv", quote="\"", comment.char="") # list of RDA candidate genes
+gene_list <- gene_names$V1
+gene_list <- as.list(gene_list)
+```
+
+### Make GOsemsimDATA object used for enrichment analysis 
+```{r}
+SemData_tef <- godata(OrgDb = "org.Etef.eg.db", keytype = "GID", ont = "BP", computeIC = TRUE)
+```
+
+######### Test parameters for enrichGO #########
+```{r}
+ego_s1 <- enrichGO(gene = gene_list[[1]], 
+                   OrgDb = "org.Etef.eg.db", keyType="GID", ont="BP", 
+                   pAdjustMethod = "BH", qvalueCutoff = 0.05, 
+                   minGSSize = 10, maxGSSize = 1000)
+
+# These methods are all similar but not exactly the same. I ended up deciding to use "Rel".
+ego_s1_Rel <- simplify(ego_s1, cutoff = 0.6, measure = "Rel", semData = SemData_tef)
+ego_s1_Rel@result$Description
+
+ego_s1_Jiang <- simplify(ego_s1, cutoff = 0.6, measure = "Jiang", semData = SemData_tef)
+ego_s1_Jiang@result$Description
+
+ego_s1_Wang <- simplify(ego_s1, cutoff = 0.6, measure = "Wang", semData = SemData_tef)
+ego_s1_Wang@result$Description
+
+ego_s1_Lin <- simplify(ego_s1, cutoff = 0.6, measure = "Lin", semData = SemData_tef)
+ego_s1_Lin@result$Description
+
+ego_s1_Resnik <- simplify(ego_s1, cutoff = 0.6, measure = "Resnik", semData = SemData_tef)
+ego_s1_Resnik@result$Description
+```
+######### Perform enrichGO analysis #########
+### Use enricher for visualizing a single gene list
+```{r}
+ego_list <- list()  #store enrichGO output
+ego_list_Rel <- list()   #store enrichGO output after simplify with "Rel" method
+GO_list <- list()    #store result table
+GO_list_Rel <- list()   #store result table after simplify with "Rel" method
+updated_GO_list <- list()
+updated_ego_list_Rel <- list()
+updated_GO_list_Rel <- list()
+
+for (module in seq_along(gene_list)){
+  GENE_ID <- gene_list[[module]]
+  ego <- enrichGO(gene = GENE_ID, 
+                  OrgDb = "org.Etef.eg.db", keyType="GID", ont="BP", 
+                  pAdjustMethod = "BH", qvalueCutoff = 0.05, 
+                  minGSSize = 10, maxGSSize = 1000) 
+  ego_list[[module]] <- ego
+}
+
+ego_list2 <- Filter(function(x) !is.null(x), ego_list)
+
+for (module in seq_along(ego_list2)){
+GO_list[[module]] <- ego_list2[[module]][ego_list2[[1]]$p.adjust < 0.05,]
+gene_value <- ego_list2[[module]]@gene
+updated_GO_list[[gene_value]] <- GO_list[[module]]
+}
+
+for (module in seq_along(ego_list2)){
+ego_Rel <- simplify(ego_list2[[module]], cutoff = 0.6, measure = "Rel", semData = SemData_tef
+                   
+ego_list_Rel[[module]] <- ego_Rel
+GO_list_Rel[[module]] <- ego_Rel@result
+gene_value <- ego_list2[[module]]@gene
+updated_ego_list_Rel[[gene_value]] <- ego_list_Rel[[module]]
+updated_GO_list_Rel[[gene_value]] <- GO_list_Rel[[module]]
+}
+
+# Save files
+write_xlsx(updated_GO_list, "GO_clusterProfiler.xlsx")
+write_xlsx(updated_GO_list_Rel, "GO_clusterProfiler_Rel0.6.xlsx")
+```
+                    
+### Create excel file of GO terms (unlisted) with environmental data
+```{r}
+# Load gene model (highest correlation) RDA environmental predictors
+env <- read.csv("/local/Gene_ID_clusterProfiler/GO_geneID_RDApredictors.csv")
+
+# Unlist GO terms      
+combined_df <- data.frame()
+for (i in seq_along(updated_GO_list_Rel)) {
+  combined_df <- rbind(combined_df, updated_GO_list_Rel[[i]])}
+
+# Retain distinct terms and merge with environmental data
+combined_df2 <- combined_df %>% distinct()
+combined_df2 <- merge(combined_df2, env, by = "geneID")
+
+# Write excel file
+write_xlsx(combined_df2, "GO_clusterProfiler_Rel0.6_unlisted.xlsx")
+```
+############################################################################################################################
+### Visualization of GO enrichment analysis for 63 of the RDA-1kb genes. 
+#### Analysis was limited to genes that had annotations in the SvOrgdb and had gene sets between 10 - 1000
+#### Other gene set parameters were tested (lower and higher), no differences were observed.
+
+### Dot Plots
+```{r}
+dot_dabbi <- lapply(names(updated_ego_list_Rel), function(x){dotplot(updated_ego_list_Rel[[x]], x = "count", showCategory=100, title = x, font.size =6, label_format = 30)})
+dot_dabbi[[1]] # replace number with list number associated with GO term of interest
+```
+
+### Use compareCluster for comparison between gene lists
+```{r}
+# Cluster and compare all gene models (no environment)
+Cluster_AZ <- compareCluster(names(updated_ego_list_Rel), fun = "enrichGO",
+                             pAdjustMethod = "BH", qvalueCutoff = 0.05, 
+                             minGSSize = 10, maxGSSize = 1000)
+
+# Cluster and compare all gene models by environment
+Cluster_AZ_env <- compareCluster(geneID ~ RDA_predictor, data = env, fun = "enrichGO",
+                             OrgDb = "org.Etef.eg.db", keyType="GID", ont="BP", 
+                             pAdjustMethod = "BH", qvalueCutoff = 0.05, 
+                             minGSSize = 10, maxGSSize = 1000)
+
+#Simplify redundant terms
+Cluster_AZ_s <- simplify(Cluster_AZ, cutoff=0.6, by="p.adjust", measure = "Rel", semData = SemData_tef)
+Cluster_AZ_s_env <- simplify(Cluster_AZ_env, cutoff=0.6, by="p.adjust", measure = "Rel", semData = SemData_tef)
+```
+                    
+# compareCluster result visualization
+```{r}
+# Dot plots
+dotplot(Cluster_AZ_s, showCategory = 10, font.size =8, label_format = 30)
+dotplot(Cluster_AZ_s_env, showCategory = 10, font.size =8, label_format = 30)
+
+# Mapping networks - visualization
+pairwise_cluster_s_env <- pairwise_termsim(Cluster_AZ_s_env)
+p1 <- emapplot(pairwise_cluster_s_env)
+p1 + scale_fill_manual(values=c("darkorchid4","red","chartreuse4","yellow","slategray1" ))
+
+p1 <- emapplot_cluster(pairwise_cluster_s_env, showCategory = 30)
+p1 + scale_fill_manual(values=c("darkorchid4","red","chartreuse4","yellow","slategray1" ))
+treeplot(pairwise_cluster_s_env, fontsize = 3, cex_category = .1, offset.params = list(extend = .1), mar = c(5, 2, 5, 5), align = "right", hexpand = 0.5, offset = rel(.75), offset_tiplab = rel(1.5)) + theme(axis.text.x = element_text(size = 3)) 
+
+# Tree diagrams
+treeplot(pairwise_cluster_s_env, fontsize = 3, cex_category = .1, offset.params = list(extend = .1), mar = c(5, 2, 5, 5), align = "right", hexpand = 0.5, offset = rel(.75), offset_tiplab = rel(1.5)) + theme(axis.text.x = element_text(size = 3))
+```
+
+```                    
+                    
