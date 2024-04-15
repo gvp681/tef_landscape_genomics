@@ -1,4 +1,3 @@
-<details>
 <summary>BAM_PREP_FOR_CALLER STEPS</summary>
 
 1.	Make sure reference fasta file is indexed before beginning
@@ -16,4 +15,4 @@
   	Run $ bash CALCULATE_BAM_COVERAGE.sh 
   	Transfer gzipped bed file to local computer and run through Rstudio OR go to /COVERAGE_FIGURES and run in terminal (to create boxplots that will identify read count outliers and modal values)
 
-</details>
+
