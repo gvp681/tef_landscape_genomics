@@ -1,0 +1,254 @@
+########################################################
+
+## Program: Fastp
+## Purpose: QC Filtering and Trimming
+## Script Usage: 'sbatch fastp.sh'
+
+#!/bin/bash
+#SBATCH --nodes=1
+#SBATCH --ntasks=10
+#SBATCH --time=10:00:00
+#SBATCH --partition=shas
+#SBATCH --qos=normal
+#SBATCH --job-name=1_fastp
+#SBATCH --output=fastp_output
+
+#activate a base conda environment
+eval "$(conda shell.bash hook)"
+  
+#now activate the conda environment you want to use
+conda activate testbio
+ 
+#now go to the directory with your data
+cd /scratch/summit/gvp681@colostate.edu/v2_raw/Plate_1/
+
+#loop
+for f in *R1_001.fastq.gz
+do
+r1=$f
+r2=${f/R1_001.fastq.gz}R2_001.fastq.gz
+r3=${f/R1_001.fastq.gz}trimmed_R1_001.fastq.gz
+r4=${f/R1_001.fastq.gz}trimmed_R2_001.fastq.gz
+r5=${f/R1_001.fastq.gz}.html
+fastp -i $r1 -I $r2 -o $r3 -O $r4 -h $r5
+done 
+
+########################################################
+
+## Program: BWA
+## Purpose: Indexing the reference assembly
+## Script Usage (in command-line): bwa index Eragrostis.faa 
+
+########################################################
+
+## Program:BWA
+## Purpose: Align trimmed reads with indexed reference sequence
+## Script Usage: sbatch BWA_aln.sh
+
+#!/bin/bash
+#SBATCH --nodes=1
+#SBATCH --ntasks=24
+#SBATCH --time=24:00:00
+#SBATCH --partition=shas
+#SBATCH --mail-user=gvp681@colostate.edu 
+#SBATCH --mail-type=END
+#SBATCH --qos=normal
+#SBATCH --job-name=BWA_Plate3ABCD
+#SBATCH --output=BWA_output2
+
+#now go to the directory with your data
+cd /scratch/summit/gvp681@colostate.edu/v2_raw/Plate_*/
+
+#unzip compressed trimmed files
+gunzip *trimmed*.gz
+
+#loop
+for i in *trimmed_R1.fastq
+do
+r1=$i
+r2=${i/trimmed_R1.fastq}trimmed_R2.fastq
+r3=${i/trimmed_R1.fastq}
+bwa mem -M -t 15 Eragrostis_tef_tef.faa $r1 $r2 > ${r3}.sam
+done
+
+###########################################################
+
+## Program: Samtools
+## Purpose: Check sam files for corruption
+## Script Usage: bash BAM_CHECK.sh *.sam
+
+#!/bin/bash
+#SBATCH --nodes=1
+#SBATCH --ntasks=1
+#SBATCH --time=1:00:00
+#SBATCH --qos=normal
+#SBATCH --partition=shas
+#SBATCH --job-name=BAM_check
+#SBATCH --output=BAM_check
+
+echo "[$0] $SLURM_JOB_NAME $@" # log the command line
+
+# run this script like sbatch quickcheck.sh *.sam
+
+for file in $@
+do
+    samtools quickcheck $file # this sets $? to 0 if successful
+    if  [ "$?" -eq 0 ]
+    then
+        echo "$file is OK"
+    else
+        echo "$file is not OK"
+    fi
+done
+
+###########################################################
+
+## Program: Samtools
+## Purpose: Convert sam files to bam files 
+## Script Usage: sbatch SAM_BAM.sh
+
+#!/bin/bash
+#SBATCH --nodes=1
+#SBATCH --ntasks=15
+#SBATCH --time=17:00:00
+#SBATCH --partition=shas
+#SBATCH --qos=normal
+#SBATCH --job-name=bam_plate1
+#SBATCH --output=bam.txt
+
+for f in *.sam
+do
+r1=$f
+r2=${f/.sam}.bam
+samtools view -@ 15 -S -b $r1 > $r2
+done
+
+###########################################################
+
+## Program: Samtools
+## Purpose: Sort .bam files by read names  
+## Script usage: sbatch name_sort_copy.sh
+
+#!/bin/bash
+#SBATCH --nodes=1
+#SBATCH --ntasks=1
+#SBATCH --time=15:00:00
+#SBATCH --partition=shas
+#SBATCH --qos=normal
+#SBATCH --job-name=n_bam_1
+#SBATCH --output=n_sort
+
+for f in *.bam
+do
+r1=$f
+r2=${f/.bam}nsorted.bam
+samtools sort -n $r1 -o $r2
+done
+
+###########################################################
+
+## Program: Samtools
+## Purpose: Identify duplicate reads in sorted bam files 
+## Script Usage: sbatch bam_fix.sh 
+
+#!/bin/bash
+#SBATCH --nodes=1
+#SBATCH --ntasks=1
+#SBATCH --time=18:00:00
+#SBATCH --partition=shas
+#SBATCH --qos=normal
+#SBATCH --job-name=1_fix_bam
+#SBATCH --output=fix_bam
+
+for f in *sorted.bam
+do
+r1=$f
+r2=${f/sorted.bam}sorted_fix.bam
+samtools fixmate -m $r1 $r2
+done
+
+###########################################################
+
+## Program: Samtools
+## Purpose: Sort alignments again—but by leftmost coordinate 
+## Script Usage: sbatch bam_sort.sh 
+
+#!/bin/bash
+#SBATCH --nodes=1
+#SBATCH --ntasks=1
+#SBATCH --time=24:00:00
+#SBATCH --partition=shas
+#SBATCH --qos=normal
+#SBATCH --job-name=1_sort
+#SBATCH --output=sort_chromo
+
+for f in *.bam
+do
+r1=$f
+r2=${f/.bam}sorted.bam
+samtools sort $r1 -o $r2
+done
+
+###########################################################
+
+## Program: Samtools
+## Purpose: Mark duplicate alignments (to get only unique mates), removal of very short reads with fewer than 20 bases (Pat chose 10) and non-properly paired reads, and index sorted bam files 
+## Script Usage: sbatch bam_mark.sh
+
+#!/bin/bash
+#SBATCH --nodes=1
+#SBATCH --ntasks=1
+#SBATCH --time=24:00:00
+#SBATCH --partition=shas
+#SBATCH --qos=normal
+#SBATCH --job-name=mark_bam
+#SBATCH --output=mark_bam
+for f in *nsorted_fixsorted.bam
+do
+r1=$f
+r2=${f/nsorted_fixsorted.bam}sorted_fix_pos_mark.bam
+samtools markdup $r1 $r2
+done
+
+###########################################################
+
+## Program: Samtools
+## Purpose: Removal of very short reads with fewer than 20 bases (Pat chose 10) and non-properly paired reads. 
+## Script Usage: sbatch prop.sh
+
+#!/bin/bash
+#SBATCH --nodes=1
+#SBATCH --ntasks=1
+#SBATCH --time=24:00:00
+#SBATCH --partition=shas
+#SBATCH --qos=normal
+#SBATCH --job-name=prop_bam
+#SBATCH --output=prop_bam
+for f in *sorted_fix_pos_mark.bam
+do
+r1=$f
+r2=${f/sorted_fix_pos_mark.bam}prop.bam
+samtools view -q 10 -f 0x002 -b $r1 > $r2
+done
+
+###########################################################
+
+## Program: Samtools
+## Purpose: Index sorted bam files 
+## Script Usage: sbatch index.sh
+
+#!/bin/bash
+#SBATCH --nodes=1
+#SBATCH --ntasks=1
+#SBATCH --time=24:00:00
+#SBATCH --partition=shas
+#SBATCH --qos=normal
+#SBATCH --job-name=prop_bam
+#SBATCH --output=prop_index
+module_purge
+for f in *_prop.bam
+do
+samtools index $f
+done
+
+###########################################################

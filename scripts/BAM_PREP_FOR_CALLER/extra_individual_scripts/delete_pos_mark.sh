@@ -1,0 +1,33 @@
+#!/bin/bash
+#SBATCH --nodes=1
+#SBATCH --ntasks=1
+#SBATCH --time=5:00:00
+#SBATCH --partition=shas
+#SBATCH --qos=normal
+#SBATCH --job-name=delete_pos_mark
+#SBATCH --output=delete_pos_mark
+
+cd /scratch/summit/gvp681@colostate.edu/raw_1
+rm *pos_mark.bam
+cd /scratch/summit/gvp681@colostate.edu/raw_2
+rm *pos_mark.bam
+cd /scratch/summit/gvp681@colostate.edu/raw_3
+rm *pos_mark.bam
+cd /scratch/summit/gvp681@colostate.edu/raw_4
+rm *pos_mark.bam
+cd /scratch/summit/gvp681@colostate.edu/raw_5
+rm *pos_mark.bam
+cd /scratch/summit/gvp681@colostate.edu/raw_6
+rm *pos_mark.bam
+cd /scratch/summit/gvp681@colostate.edu/raw_7
+rm *pos_mark.bam
+cd /scratch/summit/gvp681@colostate.edu/raw_8
+rm *pos_mark.bam
+cd /scratch/summit/gvp681@colostate.edu/raw_9
+rm *pos_mark.bam
+cd /scratch/summit/gvp681@colostate.edu/raw_10
+rm *pos_mark.bam
+cd /scratch/summit/gvp681@colostate.edu/raw_11
+rm *pos_mark.bam
+cd /scratch/summit/gvp681@colostate.edu/raw_check
+rm *pos_mark.bam
