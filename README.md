@@ -1,5 +1,5 @@
 # Genetic Diversity and Adaptation Along Multivariate Environmental Gradients in Ethiopian Tef Landraces
-Scripts used in Hein et al. (in submission)
+Scripts used in Hein et al. (in prep)
 
 ## Publication
 If you use the data or scripts from this repository in your research, please cite this publication:
