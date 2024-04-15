@@ -8,4 +8,5 @@ If you use the data or scripts from this repository in your research, please cit
 
 [Insert full citation here]
 
-***Please note:*** If another citation was previously acknowledged for accreditation within the script, kindly adhere to that citation instead.
+>[!IMPORTANT]
+> If another citation was previously acknowledged for accreditation within the script, kindly adhere to that citation instead.
