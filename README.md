@@ -4,7 +4,7 @@ Scripts used in Hein et al. (in submission)
 ## Publication
 If you use the data or scripts from this repository in your research, please cite this publication:
 
-Genetic Diversity and Adaptation Along Multivariate Environmental Gradients in Ethiopian Tef Landraces
+*Genetic Diversity and Adaptation Along Multivariate Environmental Gradients in Ethiopian Tef Landraces*
 
 [Insert full citation here]
 
