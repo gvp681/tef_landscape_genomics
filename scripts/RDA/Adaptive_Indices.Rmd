@@ -311,3 +311,95 @@ ggplot(data = RDA_proj_offset) +
     theme(panel.grid = element_blank(), plot.background = element_blank(), panel.background = element_blank(), strip.text = element_text(size=11))
 ```
 
+## Plotting Present - Future Climate Projections + Genomic Offsets
+
+```{r}
+### Prepare Current Projections Table
+RDA_proj <- list(res_RDA_proj2080$Proj_pres$RDA1, res_RDA_proj2080$Proj_pres$RDA2)
+RDA_proj <- lapply(RDA_proj, function(x) rasterToPoints(x))
+for(i in 1:length(RDA_proj)){
+     RDA_proj[[i]][,3] <- (RDA_proj[[i]][,3]-min(RDA_proj[[i]][,3]))/(max(RDA_proj[[i]][,3])-min(RDA_proj[[i]][,3]))
+ }
+ TAB_RDA <- as.data.frame(do.call(rbind, RDA_proj[1:2]))
+ colnames(TAB_RDA)[3] <- "value"
+ TAB_RDA$variable <- factor(c(rep("RDA1", nrow(RDA_proj[[1]])), rep("RDA2", nrow(RDA_proj[[2]]))), levels = c("RDA1","RDA2"))
+ 
+### Prepare Future Projections Table
+RDA_proj2 <- list(res_RDA_proj2080$Proj_fut$RDA1, res_RDA_proj2080$Proj_fut$RDA2)
+RDA_proj2 <- lapply(RDA_proj2, function(x) rasterToPoints(x))
+for(i in 1:length(RDA_proj2)){
+     RDA_proj2[[i]][,3] <- (RDA_proj2[[i]][,3]-min(RDA_proj2[[i]][,3]))/(max(RDA_proj2[[i]][,3])-min(RDA_proj2[[i]][,3]))
+ }
+ PRED_RDA <- as.data.frame(do.call(rbind, RDA_proj2[1:2]))
+ colnames(PRED_RDA)[3] <- "value"
+ PRED_RDA$variable <- factor(c(rep("RDA1", nrow(RDA_proj2[[1]])), rep("RDA2", nrow(RDA_proj2[[2]]))), levels = c("RDA1","RDA2"))
+```
+
+### Prepare Genomic Offsets Table  
+```{r}
+RDA_proj3 <- list(res_RDA_proj2080$Proj_offset$RDA1, res_RDA_proj2080$Proj_offset$RDA2)
+RDA_proj3 <- lapply(RDA_proj3, function(x) rasterToPoints(x))
+for(i in 1:length(RDA_proj3)){
+     RDA_proj3[[i]][,3] <- (RDA_proj3[[i]][,3]-min(RDA_proj3[[i]][,3]))/(max(RDA_proj3[[i]][,3])-min(RDA_proj3[[i]][,3]))
+ }
+ OFF_RDA <- as.data.frame(do.call(rbind, RDA_proj2[1:2]))
+ colnames(OFF_RDA)[3] <- "value"
+ OFF_RDA$variable <- factor(c(rep("RDA1", nrow(RDA_proj3[[1]])), rep("RDA2", nrow(RDA_proj3[[2]]))), levels = c("RDA1","RDA2"))
+
+### Prepare Current and Future Projections Tables for GGPLOT2  
+TAB_RDA$group <- "2018"
+TAB_RDA$group <- as.factor(TAB_RDA$group)
+PRED_RDA$group <- "2080"
+PRED_RDA$group <- as.factor(PRED_RDA$group)
+combined_RDA <- rbind(TAB_RDA,PRED_RDA)
+```
+
+### Plot Current and Future Projections onto Map
+```{r}
+ggplot(data = combined_RDA) +
+    geom_sf(data = et, fill=gray(.9), size=0) +
+    geom_raster(aes(x = x, y = y, fill = cut(value, breaks=seq(0, 1, length.out=10), include.lowest = T))) +
+    scale_fill_viridis_d(alpha = 0.8, direction = -1, option = "A", labels = c("Negative scores","","","","Intermediate scores","","","","Positive scores")) +
+    geom_sf(data = et, fill=NA, size=0.1) +
+    coord_sf(xlim = c(33, 48), ylim = c(3, 15), expand = FALSE) +
+    xlab("Longitude") + ylab("Latitude") +
+    guides(fill=guide_legend(title="Adaptive index")) +
+    facet_grid(variable ~ group) +
+    theme_bw(base_size = 11, base_family = "Times") +
+    theme(panel.grid = element_blank(), plot.background = element_blank(), panel.background = element_blank(), strip.text = element_text(size=11))
+```
+
+### Prepare Genomic Offsets Table for GGPLOT2
+```{r}
+OFF_RDA$group <- "Genomic Offset"
+OFF_RDA$group <- as.factor(OFF_RDA$group)
+colors <- c(colorRampPalette(brewer.pal(11, "Spectral")[6:5])(2), colorRampPalette(brewer.pal(11, "Spectral")[4:3])(2), colorRampPalette(brewer.pal(11, "Spectral")[2:1])(3))
+```
+
+### Plot Genomic Offsets Projections onto Map
+```{r}
+ggplot(data = OFF_RDA) +
+    geom_sf(data = et, fill=gray(.9), size=0) +
+    geom_raster(aes(x = x, y = y, fill = cut(value, breaks=seq(0, 1, length.out=5), include.lowest = T))) +
+    scale_fill_manual(values = colors, guide = guide_legend(title="Genomic offset", title.position = "top", title.hjust = 0.5, ncol = 1, label.position="right"), na.translate = FALSE) +
+    geom_sf(data = et, fill=NA, size=0.1) +
+    coord_sf(xlim = c(33, 48), ylim = c(3, 15), expand = FALSE) +
+    xlab("Longitude") + ylab("Latitude") +
+    guides(fill=guide_legend(title="Genomic Offset")) +
+    facet_grid(variable ~ group) +
+    theme_bw(base_size = 11, base_family = "Times") +
+    theme(panel.grid = element_blank(), plot.background = element_blank(), panel.background = element_blank(), strip.text = element_text(size=11))
+
+ggplot(data = OFF_RDA) +
+    geom_sf(data = et, fill=gray(.9), size=0) +
+    geom_raster(aes(x = x, y = y, fill = cut(value, breaks=seq(0, 1, length.out=6), include.lowest = T))) +
+    scale_fill_manual(values = colors, labels = c("0.0 - 0.2", "0.2 - 0.4","0.4 - 0.6","0.6 - 0.8","0.8 - 1.0"), guide = guide_legend(title="Genomic offset", title.position = "top", title.hjust = 0.5, ncol = 1, label.position="right"), na.translate = FALSE) +
+    geom_sf(data = et, fill=NA, size=0.1) +
+    coord_sf(xlim = c(33, 48), ylim = c(3, 15), expand = FALSE) +
+    xlab("Longitude") + ylab("Latitude") +
+    guides(fill=guide_legend(title="Genomic Offset")) +
+    facet_grid(variable ~ group) +
+    theme_bw(base_size = 11, base_family = "Times") +
+    theme(panel.grid = element_blank(), plot.background = element_blank(), panel.background = element_blank(), strip.text = element_text(size=11))
+
+```
