@@ -34,7 +34,7 @@ identical(rownames(gen.imp), env[,1])
 pred <- subset(env, select = c("bio1","bio7","bio13","bio14","bio18","bio19")) 
 
 ## Save Files
-save(rda,"rda.RData") #RDA data
+save(rda, file = "rda.RData") #RDA data
 write.csv(pred,"env_subset_rda.csv")
 ```
 
