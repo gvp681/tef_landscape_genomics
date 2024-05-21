@@ -24,17 +24,25 @@ sum(is.na(gen.imp)) # No NAs
 
 ## Confirm that genotypes and environmental data are in the same order
 identical(rownames(gen.imp), env[,1]) 
-
+                 
 ########### analysis ready #############
+rda <- rda(gen.imp ~ ., data=env, scale=T)
                  
 ### Post-testing for environmental factor multicollinearity (|r| > 0.7 ; VIF less than or equal to 5) and 
 ### formal testing for analysis of variance to assess the significance of both the full model and reduced models. 
 ### Each reduced model's statistical significance was evaluated using a permutation-based analysis of variance (ANOVA) 
 ### with 999 permutations and a significance level (α) of 0.05 model, subset data with model chosen variables.
-pred <- subset(env, select = c("bio1","bio7","bio13","bio14","bio18","bio19")) 
-
+sub <- subset(env, select = c("bio1","bio7","bio13","bio14","bio18","bio19")) 
+rownames(sub) <- sub$ID
+sub <- sub[-1]
+identical(rownames(gen.imp), rownames(sub)) 
+rda <- rda(gen.imp ~ ., data=sub, scale=T)
+                 
 ## Save Files
 save(rda, file = "rda.RData") #RDA data
 write.csv(pred,"env_subset_rda.csv")
+
+### See https://popgen.nescent.org/2018-03-27_RDA_GEA.html for code relating to identification of candidate
+### SNPs involved in local adaptation and RDA model diagnostics
 ```
 
