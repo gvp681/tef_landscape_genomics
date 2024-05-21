@@ -40,7 +40,7 @@ center_env <- attr(Env, 'scaled:center')
 
 ### Create "env_pres" raster file
 ```{r}
-r <- getData("worldclim", var="bio",res=10)
+r <- raster::getData("worldclim", var="bio",res=10)
 et <- ne_states(country = "ethiopia", returnclass = "sf")
 geometry <- et$geometry
 sp_geometry <- as(geometry, "Spatial")
