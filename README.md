@@ -1,4 +1,4 @@
-# Genetic Diversity and Environmental Adaptation in Ethiopian Tef Landraces
+# Genetic Diversity and Environmental Adaptation in Ethiopian Tef 
 Scripts used in Hein et al. (in submission)
 
 ## Publication
